@@ -1,0 +1,14 @@
+<source>
+  type rds_pgsql_log
+  access_key_id     XXXXXXXXXXXXXXXXXXXX
+  secret_access_key xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  region ap-northeast-1
+  db_instance_identifier test-postgres
+  refresh_interval 30
+  tag pgsql.log
+  pos_file /tmp/pgsql-log-pos.dat
+</source>
+
+<match pgsql.log>
+  type stdout
+</match>
