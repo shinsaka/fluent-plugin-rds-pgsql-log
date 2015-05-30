@@ -15,13 +15,10 @@ class Fluent::RdsPgsqlLogInput < Fluent::Input
     super
     require 'aws-sdk'
 
-#    if @access_key_id.nil? && has_not_iam_role?
-#      raise Fluent::ConfigError.new("access_key_id is required")
-#    end
-#    if @secret_access_key.nil? && has_not_iam_role?
-#      raise Fluent::ConfigError.new("secret_access_key is required")
-#    end
-
+    if !has_iam_role?
+      raise Fluent::ConfigError.new("access_key_id is required") if @access_key_id.nil?
+      raise Fluent::ConfigError.new("secret_access_key is required") if @secret_access_key.nil?
+    end
     raise Fluent::ConfigError.new("region is required") unless @region
     raise Fluent::ConfigError.new("db_instance_identifier is required") unless @db_instance_identifier
     raise Fluent::ConfigError.new("pos_file is required") unless @pos_file
@@ -36,12 +33,14 @@ class Fluent::RdsPgsqlLogInput < Fluent::Input
     File.open(@pos_file, File::RDWR|File::CREAT).close
 
     begin
-      param = {
+      options = {
         :region => @region,
-        :access_key_id => @access_key_id,
-        :secret_access_key => @secret_access_key,
       }
-      @rds = Aws::RDS::Client.new(param)
+      if @access_key_id && @secret_access_key
+        options[:access_key_id] = @access_key_id
+        options[:secret_access_key] = @secret_access_key
+      end
+      @rds = Aws::RDS::Client.new(options)
     rescue => e
       $log.warn "RDS Client error occurred: #{e.message}"
     end
@@ -70,6 +69,15 @@ class Fluent::RdsPgsqlLogInput < Fluent::Input
     log_files = get_logfile_list
     get_logfile(log_files)
     put_posfile
+  end
+
+  def has_iam_role?
+    begin
+      ec2 = Aws::EC2::Client.new(region: @region)
+      !ec2.config.credentials.nil?
+    rescue => e
+      $log.warn "EC2 Client error occurred: #{e.message}"
+    end
   end
 
   def get_and_parse_posfile

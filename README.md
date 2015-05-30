@@ -25,13 +25,16 @@ SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt (If you using amazon linux)
 ```config
 <source>
   type rds_pgsql_log
-  access_key_id          <access_key>
-  secret_access_key      <secret_access_key>
+  # required
   region                 <region name>
   db_instance_identifier <instance identifier>
-  refresh_interval       <interval number by second(default value is 30 if omitted)>
-  tag                    <tag name(default value is rds-pgsql.log>
-  pos_file               <log getting position file(optional)>
+  # optional if you can IAM credentials
+  access_key_id          <access_key>
+  secret_access_key      <secret_access_key>
+  # optional
+  refresh_interval       <interval number by second(default: 30)>
+  tag                    <tag name(default: rds-pgsql.log>
+  pos_file               <log getting position file(default: rds-pgsql.log)>
 </source>
 ```
 
@@ -39,10 +42,10 @@ SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt (If you using amazon linux)
 ```config
 <source>
   type rds_pgsql_log
-  access_key_id     XXXXXXXXXXXXXXXXXXXX
-  secret_access_key xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   region ap-northeast-1
   db_instance_identifier test-postgres
+  access_key_id     XXXXXXXXXXXXXXXXXXXX
+  secret_access_key xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   refresh_interval  30
   tag pgsql.log
   pos_file /tmp/pgsql-log-pos.dat
@@ -55,5 +58,15 @@ SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt (If you using amazon linux)
 
 ### json output example
 ```
+
+{"time":"2015-05-30 02:19:22 UTC",
+ "host":"192.168.30.175(53092)",
+ "user":"testuser",
+ "database":"db1",
+ "pid":"9769",
+ "message_level":"LOG",
+ "message":"  statement: select 1;",
+ "log_file_name":"error/postgresql.log.2015-05-30-02"
+}
 ```
 
