@@ -10,6 +10,16 @@
 ## AWS ELB Settings
 - settings see: [PostgreSQL Database Log Files](http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.html)
 
+## When SSL certification error
+log:
+```
+SSL_connect returned=1 errno=0 state=SSLv3 read server certificate B: certificate verify failed
+```
+Do env setting follows:
+```
+SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt (If you using amazon linux)
+```
+
 ## Configuration
 
 ```config
