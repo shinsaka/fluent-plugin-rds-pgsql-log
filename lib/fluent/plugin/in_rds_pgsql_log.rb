@@ -15,11 +15,11 @@ class Fluent::RdsPgsqlLogInput < Fluent::Input
     super
     require 'aws-sdk'
 
+    raise Fluent::ConfigError.new("region is required") unless @region
     if !has_iam_role?
       raise Fluent::ConfigError.new("access_key_id is required") if @access_key_id.nil?
       raise Fluent::ConfigError.new("secret_access_key is required") if @secret_access_key.nil?
     end
-    raise Fluent::ConfigError.new("region is required") unless @region
     raise Fluent::ConfigError.new("db_instance_identifier is required") unless @db_instance_identifier
     raise Fluent::ConfigError.new("pos_file is required") unless @pos_file
     raise Fluent::ConfigError.new("refresh_interval is required") unless @refresh_interval
@@ -55,7 +55,6 @@ class Fluent::RdsPgsqlLogInput < Fluent::Input
     super
     @loop.stop
     @thread.join
-    @timestamp_file.close
   end
 
   private
