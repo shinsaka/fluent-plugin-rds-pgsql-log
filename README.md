@@ -5,7 +5,7 @@
 
 ## Installation
 
-    $ fluentd-gem fluent-plugin-rds-pgsql-log
+    $ fluentd-gem install fluent-plugin-rds-pgsql-log
 
 ## AWS ELB Settings
 - settings see: [PostgreSQL Database Log Files](http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Concepts.PostgreSQL.html)
