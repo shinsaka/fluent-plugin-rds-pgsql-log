@@ -1,5 +1,7 @@
 # Amazon RDS for PostgreSQL log input plugin for fluentd
 
+[![Gem Version](https://badge.fury.io/rb/fluent-plugin-rds-pgsql-log.svg)](https://badge.fury.io/rb/fluent-plugin-rds-pgsql-log)
+
 ## Overview
 - Amazon Web Services RDS log input plugin for fluentd
 
