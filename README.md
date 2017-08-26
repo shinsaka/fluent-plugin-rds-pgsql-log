@@ -72,3 +72,7 @@ SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt (If you using amazon linux)
 }
 ```
 
+## Changes
+### 0.2.0
+- require fluentd version 0.14.0
+
