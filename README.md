@@ -78,5 +78,3 @@ SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt (If you using amazon linux)
 
 ### 0.3.0
 - use AWS SDK v3.x
-- require fluentd version 0.14.0
-
