@@ -3,7 +3,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-rds-pgsql-log"
-  spec.version       = "0.3.0"
+  spec.version       = "0.3.1"
   spec.authors       = ["shinsaka"]
   spec.email         = ["shinx1265@gmail.com"]
   spec.summary       = "Amazon RDS for PostgreSQL log input plugin"
