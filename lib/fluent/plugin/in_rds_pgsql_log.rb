@@ -44,7 +44,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
       end
       @rds = Aws::RDS::Client.new(options)
     rescue => e
-      $log.warn "RDS Client error occurred: #{e.message}"
+      log.warn "RDS Client error occurred: #{e.message}"
     end
 
     @loop = Coolio::Loop.new
@@ -77,14 +77,14 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
       ec2 = Aws::EC2::Client.new(region: @region)
       !ec2.config.credentials.nil?
     rescue => e
-      $log.warn "EC2 Client error occurred: #{e.message}"
+      log.warn "EC2 Client error occurred: #{e.message}"
     end
   end
 
   def get_and_parse_posfile
     begin
       # get & parse pos file
-      $log.debug "pos file get start"
+      log.debug "pos file get start"
 
       pos_last_written_timestamp = 0
       pos_info = {}
@@ -94,27 +94,27 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
           pos_match = /^(\d+)$/.match(line)
           if pos_match
             pos_last_written_timestamp = pos_match[1].to_i
-            $log.debug "pos_last_written_timestamp: #{pos_last_written_timestamp}"
+            log.debug "pos_last_written_timestamp: #{pos_last_written_timestamp}"
           end
 
           pos_match = /^(.+)\t(.+)$/.match(line)
           if pos_match
             pos_info[pos_match[1]] = pos_match[2]
-            $log.debug "log_file: #{pos_match[1]}, marker: #{pos_match[2]}"
+            log.debug "log_file: #{pos_match[1]}, marker: #{pos_match[2]}"
           end
         end
         @pos_last_written_timestamp = pos_last_written_timestamp
         @pos_info = pos_info
       end
     rescue => e
-      $log.warn "pos file get and parse error occurred: #{e.message}"
+      log.warn "pos file get and parse error occurred: #{e.message}"
     end
   end
 
   def put_posfile
     # pos file write
     begin
-      $log.debug "pos file write"
+      log.debug "pos file write"
       File.open(@pos_file, File::WRONLY|File::TRUNC) do |file|
         file.puts @pos_last_written_timestamp.to_s
 
@@ -123,20 +123,20 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
         end
       end
     rescue => e
-      $log.warn "pos file write error occurred: #{e.message}"
+      log.warn "pos file write error occurred: #{e.message}"
     end
   end
 
   def get_logfile_list
     begin
-      $log.debug "get logfile-list from rds: db_instance_identifier=#{@db_instance_identifier}, pos_last_written_timestamp=#{@pos_last_written_timestamp}"
+      log.debug "get logfile-list from rds: db_instance_identifier=#{@db_instance_identifier}, pos_last_written_timestamp=#{@pos_last_written_timestamp}"
       @rds.describe_db_log_files(
         db_instance_identifier: @db_instance_identifier,
         file_last_written: @pos_last_written_timestamp,
         max_records: 10,
       )
     rescue => e
-      $log.warn "RDS Client describe_db_log_files error occurred: #{e.message}"
+      log.warn "RDS Client describe_db_log_files error occurred: #{e.message}"
     end
   end
 
@@ -151,7 +151,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
           log_file_name = item[:log_file_name]
           marker = @pos_info.has_key?(log_file_name) ? @pos_info[log_file_name] : "0"
 
-          $log.debug "download log from rds: log_file_name=#{log_file_name}, marker=#{marker}"
+          log.debug "download log from rds: log_file_name=#{log_file_name}, marker=#{marker}"
           logs = @rds.download_db_log_file_portion(
             db_instance_identifier: @db_instance_identifier,
             log_file_name: log_file_name,
@@ -164,7 +164,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
         end
       end
     rescue => e
-      $log.warn e.message
+      log.warn e.message
     end
   end
 
@@ -179,17 +179,17 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
         raw_records += log.log_file_data.split("\n")
       end
     rescue => e
-      $log.warn e.message
+      log.warn e.message
     end
     return raw_records
   end
 
   def parse_and_emit(raw_records, log_file_name)
     begin
-      $log.debug "raw_records.count: #{raw_records.count}"
+      log.debug "raw_records.count: #{raw_records.count}"
       record = nil
       raw_records.each do |raw_record|
-        $log.debug "raw_record=#{raw_record}"
+        log.debug "raw_record=#{raw_record}"
         line_match = LOG_REGEXP.match(raw_record)
 
         unless line_match
@@ -215,7 +215,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
       # emit last record
       router.emit(@tag, Fluent::Engine.now, record) unless record.nil?
     rescue => e
-      $log.warn e.message
+      log.warn e.message
     end
   end
 
