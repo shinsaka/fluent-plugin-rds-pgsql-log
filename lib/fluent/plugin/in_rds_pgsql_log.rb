@@ -4,6 +4,8 @@ require 'aws-sdk'
 class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
   Fluent::Plugin.register_input('rds_pgsql_log', self)
 
+  helpers :timer
+
   LOG_REGEXP = /^(?<time>\d{4}-\d{2}-\d{2} \d{2}\:\d{2}\:\d{2} .+?):(?<host>.*?):(?<user>.*?)@(?<database>.*?):\[(?<pid>.*?)\]:(?<message_level>.*?):(?<message>.*)$/
 
   config_param :access_key_id, :string, :default => nil
@@ -47,23 +49,14 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
       log.warn "RDS Client error occurred: #{e.message}"
     end
 
-    @loop = Coolio::Loop.new
-    timer_trigger = TimerWatcher.new(@refresh_interval, true, &method(:input))
-    timer_trigger.attach(@loop)
-    @thread = Thread.new(&method(:run))
+    timer_execute(:poll_logs, @refresh_interval, repeat: true, &method(:input))
   end
 
   def shutdown
     super
-    @loop.stop
-    @thread.join
   end
 
   private
-
-  def run
-    @loop.run
-  end
 
   def input
     get_and_parse_posfile
