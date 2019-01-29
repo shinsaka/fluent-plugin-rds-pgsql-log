@@ -28,13 +28,6 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
     raise Fluent::ConfigError.new("pos_file is required") unless @pos_file
     raise Fluent::ConfigError.new("refresh_interval is required") unless @refresh_interval
     raise Fluent::ConfigError.new("tag is required") unless @tag
-  end
-
-  def start
-    super
-
-    # pos file touch
-    File.open(@pos_file, File::RDWR|File::CREAT).close
 
     begin
       options = {
@@ -48,6 +41,13 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
     rescue => e
       log.warn "RDS Client error occurred: #{e.message}"
     end
+  end
+
+  def start
+    super
+
+    # pos file touch
+    File.open(@pos_file, File::RDWR|File::CREAT).close
 
     timer_execute(:poll_logs, @refresh_interval, repeat: true, &method(:input))
   end
@@ -190,7 +190,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
           record["message"] << "\n" + raw_record unless record.nil?
         else
           # emit before record
-          router.emit(@tag, Fluent::Engine.now, record) unless record.nil?
+          router.emit(@tag, Time.parse(record["time"]), record) unless record.nil?
 
           # set a record
           record = {
@@ -206,7 +206,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
         end
       end
       # emit last record
-      router.emit(@tag, Fluent::Engine.now, record) unless record.nil?
+      router.emit(@tag, Time.parse(record["time"]), record) unless record.nil?
     rescue => e
       log.warn e.message
     end
