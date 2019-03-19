@@ -1,5 +1,6 @@
 require 'fluent/input'
-require 'aws-sdk'
+require 'aws-sdk-ec2'
+require 'aws-sdk-rds'
 
 class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
   Fluent::Plugin.register_input('rds_pgsql_log', self)
