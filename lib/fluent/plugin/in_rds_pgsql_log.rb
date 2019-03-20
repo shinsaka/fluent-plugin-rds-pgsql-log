@@ -178,6 +178,11 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
     return raw_records
   end
 
+  def event_time_of_row(record)
+    time = Time.parse(record["time"])
+    return Fluent::EventTime.from_time(time)
+  end
+
   def parse_and_emit(raw_records, log_file_name)
     begin
       log.debug "raw_records.count: #{raw_records.count}"
@@ -191,7 +196,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
           record["message"] << "\n" + raw_record unless record.nil?
         else
           # emit before record
-          router.emit(@tag, Time.parse(record["time"]), record) unless record.nil?
+          router.emit(@tag, event_time_of_row(record), record) unless record.nil?
 
           # set a record
           record = {
@@ -207,7 +212,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
         end
       end
       # emit last record
-      router.emit(@tag, Time.parse(record["time"]), record) unless record.nil?
+      router.emit(@tag, event_time_of_row(record), record) unless record.nil?
     rescue => e
       log.warn e.message
     end

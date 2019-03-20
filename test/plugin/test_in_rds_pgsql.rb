@@ -76,7 +76,8 @@ class RdsPgsqlLogInputTest < Test::Unit::TestCase
     d.run(timeout: 3, expect_emits: 1)
 
     events = d.events
-    assert_equal(events[0][1].iso8601, "2019-01-26T22:10:20Z")
+    assert_instance_of(Fluent::EventTime, events[0][1])
+    assert_equal(events[0][1].inspect, "2019-01-26 22:10:20.000000000 +0000")
     assert_equal(events[0][2]["pid"], '129155')
     assert_equal(events[0][2]["message_level"], 'LOG')
     assert_equal(events[0][2]["message"], 'some db log')

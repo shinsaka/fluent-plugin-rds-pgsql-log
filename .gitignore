@@ -1,3 +1,5 @@
 *.gem
 fluent.conf
-
+coverage/
+pgsql-log-pos.dat
+Gemfile.lock
