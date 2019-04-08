@@ -1,4 +1,5 @@
 #!/usr/bin/env rake
+ENV['TZ'] = 'UTC'
 require "bundler/gem_tasks"
 
 require "rake/testtask"
