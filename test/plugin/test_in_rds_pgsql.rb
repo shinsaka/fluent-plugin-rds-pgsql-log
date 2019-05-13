@@ -156,7 +156,7 @@ class RdsPgsqlLogInputTest < Test::Unit::TestCase
     assert_equal(describe_db_log_files_params[0], {:db_instance_identifier=>"test-postgres-id", :file_last_written=>0, :max_records=>1})
     assert_equal(download_db_log_file_portion_params[0], {:db_instance_identifier=>"test-postgres-id", :log_file_name=>"db.log", :marker=>"0"})
 
-    assert_equal(describe_db_log_files_params[1], {:db_instance_identifier=>"test-postgres-id", :file_last_written=>1548540620000, :max_records=>1})
+    assert_equal(describe_db_log_files_params[1], {:db_instance_identifier=>"test-postgres-id", :file_last_written=>1548540620001, :max_records=>1})
     assert_equal(download_db_log_file_portion_params[1], {:db_instance_identifier=>"test-postgres-id", :log_file_name=>"db.log", :marker=>"10"})
 
     events = d.events

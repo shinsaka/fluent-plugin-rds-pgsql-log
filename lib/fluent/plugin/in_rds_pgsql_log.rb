@@ -169,7 +169,13 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
       unless raw_records.nil?
         # save maximum written timestamp value
         last_seen_record_time = parse_and_emit(raw_records, log_file_name)
-        @pos_last_written_timestamp = timestamp_with_ms(last_seen_record_time) unless last_seen_record_time.nil?
+        unless last_seen_record_time.nil?
+          @pos_last_written_timestamp = timestamp_with_ms(last_seen_record_time)
+        else
+          @pos_last_written_timestamp += 1
+        end
+      else
+        @pos_last_written_timestamp += 1
       end
 
       additional_data_pending = log_file_portion.additional_data_pending
