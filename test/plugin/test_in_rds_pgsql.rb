@@ -19,7 +19,13 @@ class RdsPgsqlLogInputTest < Test::Unit::TestCase
   end
 
   def create_driver(conf = DEFAULT_CONFIG)
-    Fluent::Test::Driver::Input.new(Fluent::Plugin::RdsPgsqlLogInput).configure(parse_config conf)
+    d = Fluent::Test::Driver::Input.new(Fluent::Plugin::RdsPgsqlLogInput).configure(parse_config conf)
+
+    # Cleanup old pos_file
+    pos_file = d.instance.pos_file
+    File.delete(pos_file) if File.exist?(pos_file)
+
+    d
   end
 
   def iam_info_url
@@ -82,5 +88,98 @@ class RdsPgsqlLogInputTest < Test::Unit::TestCase
     assert_equal(events[0][2]["message_level"], 'LOG')
     assert_equal(events[0][2]["message"], 'some db log')
     assert_equal(events[0][2]["log_file_name"], 'db.log')
+  end
+
+  def test_iterating
+    use_iam_role
+    d = create_driver
+
+    aws_client_stub = Aws::RDS::Client.new(stub_responses: true)
+
+    describe_db_log_files_attempt = 0
+    describe_db_log_files_params = []
+    aws_client_stub.stub_responses(:describe_db_log_files, -> (context) {
+      describe_db_log_files_params << context.params
+      describe_db_log_files_attempt += 1
+
+      if describe_db_log_files_attempt == 1
+        return {
+          describe_db_log_files: [
+            {
+              log_file_name: 'db.log',
+              last_written: 123,
+              size: 123
+            }
+          ]
+        }
+      end
+
+      {
+        describe_db_log_files: [
+          {
+            log_file_name: 'db.log',
+            last_written: 456,
+            size: 123
+          }
+        ]
+      }
+    })
+
+    download_db_log_file_portion_attempt = 0
+    download_db_log_file_portion_params = []
+    aws_client_stub.stub_responses(:download_db_log_file_portion, -> (context) {
+      download_db_log_file_portion_params << context.params
+      download_db_log_file_portion_attempt += 1
+
+      if download_db_log_file_portion_attempt == 1
+        return {
+          log_file_data: "2019-01-26 22:10:20 UTC::@:[129155]:LOG:some db log",
+          marker: '10',
+          additional_data_pending: true
+        }
+      end
+
+      {
+        log_file_data: "2019-01-26 22:15:20 UTC::@:[129155]:LOG:some later db log",
+        marker: '20',
+        additional_data_pending: false
+      }
+    })
+
+    d.instance.instance_variable_set(:@rds, aws_client_stub)
+
+    d.run(timeout: 3, expect_emits: 2)
+
+    assert_equal(describe_db_log_files_attempt, 2)
+    assert_equal(download_db_log_file_portion_attempt, 2)
+
+    assert_equal(describe_db_log_files_params[0], {:db_instance_identifier=>"test-postgres-id", :file_last_written=>0, :max_records=>1})
+    assert_equal(download_db_log_file_portion_params[0], {:db_instance_identifier=>"test-postgres-id", :log_file_name=>"db.log", :marker=>"0"})
+
+    assert_equal(describe_db_log_files_params[1], {:db_instance_identifier=>"test-postgres-id", :file_last_written=>1548540620001, :max_records=>1})
+    assert_equal(download_db_log_file_portion_params[1], {:db_instance_identifier=>"test-postgres-id", :log_file_name=>"db.log", :marker=>"10"})
+
+    events = d.events
+    assert_equal(events[0][1].inspect, "2019-01-26 22:10:20.000000000 +0000")
+    assert_equal(events[0][2], {
+      "database"=>"",
+      "host"=>"",
+      "log_file_name"=>"db.log",
+      "message"=>"some db log",
+      "message_level"=>"LOG",
+      "pid"=>"129155",
+      "time"=>"2019-01-26 22:10:20 UTC",
+      "user"=>""
+    })
+    assert_equal(events[1][2], {
+      "database"=>"",
+      "host"=>"",
+      "log_file_name"=>"db.log",
+      "message"=>"some later db log",
+      "message_level"=>"LOG",
+      "pid"=>"129155",
+      "time"=>"2019-01-26 22:15:20 UTC",
+      "user"=>""
+    })
   end
 end

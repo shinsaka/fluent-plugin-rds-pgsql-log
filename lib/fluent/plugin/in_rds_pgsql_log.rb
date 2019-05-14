@@ -50,7 +50,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
     # pos file touch
     File.open(@pos_file, File::RDWR|File::CREAT).close
 
-    timer_execute(:poll_logs, @refresh_interval, repeat: true, &method(:input))
+    schedule_next
   end
 
   def shutdown
@@ -61,9 +61,25 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
 
   def input
     get_and_parse_posfile
-    log_files = get_logfile_list
-    get_logfile(log_files)
+
+    log_files = get_first_unseen_log_file
+    return schedule_next if log_files.empty?
+
+    additional_data_pending = read_and_forward(log_files[0])
+
     put_posfile
+
+    # Directly schedule next fetch if additional data is pending
+    return schedule_next(1) if additional_data_pending
+
+    schedule_next
+  rescue => e
+    log.warn "input fetching error occurred: #{e.message}"
+    schedule_next
+  end
+
+  def schedule_next(interval = @refresh_interval)
+    timer_execute(:poll_logs, interval, repeat: false, &method(:input))
   end
 
   def has_iam_role?
@@ -121,61 +137,64 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
     end
   end
 
-  def get_logfile_list
+  def get_first_unseen_log_file
     begin
       log.debug "get logfile-list from rds: db_instance_identifier=#{@db_instance_identifier}, pos_last_written_timestamp=#{@pos_last_written_timestamp}"
-      @rds.describe_db_log_files(
+      response = @rds.describe_db_log_files(
         db_instance_identifier: @db_instance_identifier,
         file_last_written: @pos_last_written_timestamp,
-        max_records: 10,
+        max_records: 1,
       )
+
+      response[:describe_db_log_files]
     rescue => e
       log.warn "RDS Client describe_db_log_files error occurred: #{e.message}"
     end
   end
 
-  def get_logfile(log_files)
+  def read_and_forward(log_file)
     begin
-      log_files.each do |log_file|
-        log_file.describe_db_log_files.each do |item|
-          # save maximum written timestamp value
-          @pos_last_written_timestamp = item[:last_written] if @pos_last_written_timestamp < item[:last_written]
+      # log file download
+      log_file_name = log_file[:log_file_name]
+      marker = @pos_info.has_key?(log_file_name) ? @pos_info[log_file_name] : "0"
 
-          # log file download
-          log_file_name = item[:log_file_name]
-          marker = @pos_info.has_key?(log_file_name) ? @pos_info[log_file_name] : "0"
+      log.debug "download log from rds: log_file_name=#{log_file_name}, marker=#{marker}"
+      log_file_portion = @rds.download_db_log_file_portion(
+        db_instance_identifier: @db_instance_identifier,
+        log_file_name: log_file_name,
+        marker: marker,
+      )
+      raw_records = get_logdata(log_file_portion, log_file_name)
 
-          log.debug "download log from rds: log_file_name=#{log_file_name}, marker=#{marker}"
-          logs = @rds.download_db_log_file_portion(
-            db_instance_identifier: @db_instance_identifier,
-            log_file_name: log_file_name,
-            marker: marker,
-          )
-          raw_records = get_logdata(logs)
-
-          #emit
-          parse_and_emit(raw_records, log_file_name) unless raw_records.nil?
+      unless raw_records.nil?
+        # save maximum written timestamp value
+        last_seen_record_time = parse_and_emit(raw_records, log_file_name)
+        unless last_seen_record_time.nil?
+          @pos_last_written_timestamp = timestamp_with_ms(last_seen_record_time)
+        else
+          @pos_last_written_timestamp += 1
         end
+      else
+        @pos_last_written_timestamp += 1
       end
+
+      additional_data_pending = log_file_portion.additional_data_pending
     rescue => e
       log.warn e.message
     end
   end
 
-  def get_logdata(logs)
-    log_file_name = logs.context.params[:log_file_name]
-    raw_records = []
-    begin
-      logs.each do |log|
-        # save got line's marker
-        @pos_info[log_file_name] = log.marker
+  def timestamp_with_ms(time)
+    (Time.parse(time).to_f * 1000).to_i
+  end
 
-        raw_records += log.log_file_data.split("\n")
-      end
-    rescue => e
-      log.warn e.message
-    end
-    return raw_records
+  def get_logdata(log_file_portion, log_file_name)
+    # save got line's marker
+    @pos_info[log_file_name] = log_file_portion.marker
+
+    log_file_portion.log_file_data.split("\n")
+  rescue => e
+    log.warn e.message
   end
 
   def event_time_of_row(record)
@@ -184,6 +203,8 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
   end
 
   def parse_and_emit(raw_records, log_file_name)
+    last_seen_record_time = nil
+
     begin
       log.debug "raw_records.count: #{raw_records.count}"
       record = nil
@@ -199,6 +220,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
           router.emit(@tag, event_time_of_row(record), record) unless record.nil?
 
           # set a record
+          last_seen_record_time = line_match[:time]
           record = {
             "time" => line_match[:time],
             "host" => line_match[:host],
@@ -216,17 +238,7 @@ class Fluent::Plugin::RdsPgsqlLogInput < Fluent::Plugin::Input
     rescue => e
       log.warn e.message
     end
-  end
 
-  class TimerWatcher < Coolio::TimerWatcher
-    def initialize(interval, repeat, &callback)
-      @callback = callback
-      on_timer # first call
-      super(interval, repeat)
-    end
-
-    def on_timer
-      @callback.call
-    end
+    last_seen_record_time
   end
 end
